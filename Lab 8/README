@@ -42,4 +42,7 @@ The lesson for production systems is direct: **an inference pipeline without a f
 
 ---
 
+Industry experimentation frameworks — most notably Netflix's Return-Aware Experimentation model — treat the decision threshold not as a fixed scientific convention but as a function of the cost asymmetry between error types. Where academic practice anchors to p < 0.05 as a universal falsification standard, production systems calibrate α dynamically: a low-stakes UI test tolerates a higher false-positive rate because the cost of a wrong shipping decision is low and reversible, while an algorithm change affecting core recommendation quality demands a far more conservative threshold.
+The implication is that α is a business parameter — encoding the ratio of Type I to Type II error costs, the reversibility of the decision, and the scale of downstream exposure — not a statistical constant inherited from Fisher. A rigorous analyst sets the threshold before running the test and justifies it in economic terms, not methodological convention.
+
 *Part of ECON 5200: Applied Data Analytics in Economics*
