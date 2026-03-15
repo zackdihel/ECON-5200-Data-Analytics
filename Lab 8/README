@@ -1,0 +1,45 @@
+## Lab 8: Hypothesis Testing & Causal Evidence Architecture
+
+**Domain:** Causal Inference · Statistical Decision Theory · Programme Evaluation  
+**Tools:** Python, SciPy (`ttest_ind`, permutation testing), Pandas, NumPy  
+**Dataset:** Lalonde (1986) — National Supported Work Demonstration
+
+---
+
+### Objective
+
+Most applied analytics stops at estimation: fit a model, extract a coefficient, ship an insight. This lab operationalises the step that comes before that output is credible — **falsification**. Using the Lalonde (1986) randomised controlled trial, the analysis pivots from "what does the model say?" to "can we reject the claim that the model is wrong?" — the harder, more epistemically honest question. The goal is not to prove that job training works. It is to build an evidentiary structure rigorous enough to *survive an attempt to prove that it doesn't*.
+
+---
+
+### Technical Approach
+
+- **Welch's T-Test (Parametric — SciPy `ttest_ind`):** Computed the **Average Treatment Effect (ATE)** of job training on real post-programme earnings by measuring the signal-to-noise ratio between treatment and control group distributions. Welch's formulation — which relaxes the equal-variance assumption of Student's T — was selected specifically because real-world earnings distributions violate homoscedasticity systematically: high-earner variance in the treatment arm cannot be assumed equal to the control. The resulting t-statistic quantifies whether the observed earnings gap is large relative to the uncertainty in both groups simultaneously.
+
+- **Non-Parametric Permutation Test (10,000 resamples):** Validated the parametric result against the assumption of approximate normality by constructing an **empirical null distribution** from scratch. Under the null hypothesis that treatment assignment is irrelevant, randomly shuffling the treatment labels 10,000 times and recomputing the mean difference each time produces the distribution of outcomes attributable to chance alone. The observed ATE is then located within this empirical distribution — no distributional assumptions required. This is not a robustness check as an afterthought; it is a second, independent adjudication using a different epistemological machinery.
+
+- **Type I Error Control:** Maintained explicit significance thresholds (α = 0.05) throughout, with awareness of the multiple-testing environment. A result that is "significant" is only meaningful if the criteria for significance were fixed *before* the data was interrogated — not after promising results were observed. This discipline is the methodological minimum for any inference claimed to be causal.
+
+---
+
+### Key Findings
+
+Welch's T-Test returned a statistically significant **Average Treatment Effect of approximately +$1,795** in real annual earnings for programme participants, with the result reproduced under the permutation test — placing the observed effect far into the tail of the empirical null distribution. The Null Hypothesis (that job training produces no earnings effect) is rejected via **Proof by Statistical Contradiction**: the observed data is sufficiently improbable under the null that the null is no longer a credible account of how the data was generated.
+
+The convergence of parametric and non-parametric methods on the same conclusion is the finding that matters most. A result that survives only one testing regime is fragile. A result that survives two — one assuming a parametric form, one assuming nothing — is structurally sound.
+
+---
+
+### Business Insight: Hypothesis Testing as the Safety Valve of the Algorithmic Economy
+
+At production scale, a data team that ships every correlation as a finding is not doing analysis — it is doing **data grubbing**: iterating over variable combinations until something clears a p-value threshold, then reverse-engineering a narrative to explain it. In a pipeline running hundreds of feature tests, spurious correlations are not the exception; they are *guaranteed by probability*. Run enough tests at α = 0.05 and one in twenty will reject the null by chance alone. The signal is indistinguishable from the noise without procedural discipline imposed before the analysis begins.
+
+Rigorous hypothesis testing — pre-registered hypotheses, explicit significance thresholds, non-parametric validation — is the **safety valve** that prevents this failure mode from reaching decision-makers. It is not a statistical nicety. It is the mechanism by which an organisation distinguishes *evidence* from *pattern-matching on noise*.
+
+The stakes are concrete. A product team that ships a feature on the basis of a spurious A/B result misallocates engineering capacity and degrades the user experience. A policy team that recommends a job training programme on the basis of non-robust causal estimates misallocates public funds. The Lalonde dataset is instructive precisely because it exists in the context of a real policy debate: earlier non-experimental estimates of the same programme's effect varied wildly, and several were subsequently shown to be artefacts of selection bias. The RCT — and the hypothesis testing framework built around it — was what settled the question.
+
+The lesson for production systems is direct: **an inference pipeline without a falsification layer is a liability, not an asset**. Statistical rigour is not a constraint on speed; it is the condition under which speed is safe.
+
+---
+
+*Part of ECON 5200: Applied Data Analytics in Economics*
