@@ -1,0 +1,14 @@
+!pip install streamlit fredapi statsmodels ruptures plotly -q
+import numpy as np
+import pandas as pd
+import matplotlib.pyplot as plt
+import warnings
+warnings.filterwarnings('ignore')
+
+from fredapi import Fred
+from statsmodels.tsa.seasonal import seasonal_decompose, STL, MSTL
+from statsmodels.tsa.stattools import adfuller, kpss
+import ruptures as rpt
+
+import ruptures as rpt
+from typing import Optional
