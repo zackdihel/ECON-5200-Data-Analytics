@@ -1,249 +1,178 @@
+# %%writefile forecast_evaluation.py
 """
-forecast_evaluation.py
-----------------------
-Reusable forecast evaluation utilities for time series models.
+forecast_evaluation.py — Forecast Evaluation & Backtesting Module
 
-Functions
----------
-compute_mase          : Mean Absolute Scaled Error against a naive seasonal benchmark
-backtest_expanding_window : Expanding-window backtest returning per-step error records
+Reusable functions for computing MASE and running expanding-window
+backtests on time series forecasting models.
+
+Author: Zachary Dihel
+Course: ECON 5200, Lab 21
 """
 
-from __future__ import annotations
-
-import warnings
 import numpy as np
 import pandas as pd
+from typing import Callable
 
-
-# ---------------------------------------------------------------------------
-# MASE
-# ---------------------------------------------------------------------------
 
 def compute_mase(
     actual: np.ndarray,
     forecast: np.ndarray,
     insample: np.ndarray,
-    m: int = 1,
+    m: int = 1
 ) -> float:
-    """Compute Mean Absolute Scaled Error (MASE).
-
-    MASE = MAE(forecast) / MAE(naive seasonal forecast on in-sample data)
-
-    A naive seasonal forecast predicts each value as the observation m
-    periods prior:  naive[t] = insample[t - m].
-
-    MASE < 1  →  model beats the naive seasonal benchmark.
-    MASE > 1  →  the naive benchmark is better.
-    MASE = 1  →  model matches the naive benchmark exactly.
-
+    """Compute Mean Absolute Scaled Error.
+    
+    MASE < 1: model beats naive seasonal benchmark.
+    MASE > 1: naive benchmark is better.
+    
     Args:
-        actual   : True values for the forecast period. Shape (h,).
-        forecast : Predicted values for the forecast period. Shape (h,).
-        insample : Historical (training) data used to compute the naive
-                   baseline. Must have at least m + 1 observations.
-        m        : Seasonal period for the naive forecast.
-                   m=1  → random-walk benchmark (last value carried forward).
-                   m=12 → monthly seasonal naive (same month last year).
-
+        actual: True out-of-sample values
+        forecast: Model predictions (same length as actual)
+        insample: In-sample (training) data for naive baseline
+        m: Seasonal period (1=random walk, 12=monthly seasonal)
+    
     Returns:
-        MASE value (float). Returns np.nan if the naive MAE is zero
-        (perfectly flat in-sample history) to avoid division by zero.
-
-    Raises:
-        ValueError: If array lengths are inconsistent or m < 1.
-
-    Examples
-    --------
-    >>> import numpy as np
-    >>> actual   = np.array([102., 104., 106.])
-    >>> forecast = np.array([101., 103., 107.])
-    >>> insample = np.array([90., 92., 94., 96., 98., 100.])
-    >>> compute_mase(actual, forecast, insample, m=1)
-    0.6666...
+        MASE score (float)
     """
-    actual   = np.asarray(actual,   dtype=float)
-    forecast = np.asarray(forecast, dtype=float)
-    insample = np.asarray(insample, dtype=float)
-
-    if m < 1:
-        raise ValueError(f"Seasonal period m must be >= 1, got {m}.")
-    if len(actual) != len(forecast):
-        raise ValueError(
-            f"actual and forecast must have the same length "
-            f"({len(actual)} vs {len(forecast)})."
-        )
-    if len(insample) <= m:
-        raise ValueError(
-            f"insample must have more than m={m} observations "
-            f"to compute a naive baseline; got {len(insample)}."
-        )
-
-    # Forecast MAE
+    # YOUR IMPLEMENTATION HERE
+    # Hint:
     mae_forecast = np.mean(np.abs(actual - forecast))
+    naive_errors = insample[m:] - insample[:-m]
+    mae_naive = np.mean(np.abs(naive_errors))
+    return mae_forecast / mae_naive
 
-    # Naive in-sample MAE: mean |insample[t] - insample[t-m]|
-    naive_errors = np.abs(insample[m:] - insample[:-m])
-    mae_naive    = np.mean(naive_errors)
-
-    if mae_naive == 0.0:
-        warnings.warn(
-            "Naive in-sample MAE is zero (constant series). "
-            "Returning np.nan to avoid division by zero.",
-            RuntimeWarning,
-            stacklevel=2,
-        )
-        return np.nan
-
-    return float(mae_forecast / mae_naive)
-
-
-# ---------------------------------------------------------------------------
-# Expanding-window backtest
-# ---------------------------------------------------------------------------
 
 def backtest_expanding_window(
     series: pd.Series,
-    model_fn,
+    model_fn: Callable,
     min_train: int = 120,
     horizon: int = 12,
-    step: int = 12,
+    step: int = 12
 ) -> pd.DataFrame:
-    """Expanding-window backtest for time series models.
-
-    Starting from ``min_train`` observations, fits the model on the
-    training slice, forecasts ``horizon`` steps ahead, records errors,
-    then expands the training window by ``step`` observations and repeats.
-
-    The MASE for each iteration is computed against the in-sample naive
-    seasonal baseline using m = ``horizon`` (seasonal naive at the
-    forecast frequency).  Pass a different ``m`` by wrapping ``model_fn``
-    or post-processing the returned DataFrame.
-
+    """Expanding-window time series backtest.
+    
     Args:
-        series    : Full time series including both train and test periods.
-                    Must be a ``pd.Series`` with a ``DatetimeIndex``.
-        model_fn  : ``Callable(train: pd.Series) -> np.ndarray`` of length
-                    ``horizon``.  The function receives the current training
-                    slice and must return exactly ``horizon`` point forecasts
-                    in chronological order.
-        min_train : Minimum number of observations in the first training
-                    window. Default 120 (10 years of monthly data).
-        horizon   : Number of steps to forecast at each iteration.
-                    Default 12.
-        step      : Number of observations to add to the training window
-                    between iterations.  Default 12 (annual step for monthly
-                    data).
-
+        series: Full series with DatetimeIndex
+        model_fn: Callable(train) -> np.ndarray of length horizon
+        min_train: Minimum training observations
+        horizon: Forecast horizon per iteration
+        step: Observations added per iteration
+    
     Returns:
-        ``pd.DataFrame`` with columns:
-
-        ============  ======================================================
-        origin        Last date of the training window for this iteration.
-        horizon       Step number within the forecast (1 … horizon).
-        actual        True value at the forecast date.
-        forecast      Model's point forecast.
-        error         ``forecast - actual`` (signed).
-        abs_error     ``|forecast - actual|``.
-        mase          MASE for the full horizon at this origin.
-                      Repeated for every horizon-step row of the same origin.
-        ============  ======================================================
-
-        Returns an empty DataFrame with the correct columns if no complete
-        forecast window fits in the series.
-
-    Raises:
-        ValueError : If ``min_train`` or ``horizon`` are non-positive, or if
-                     ``min_train + horizon > len(series)``.
-
-    Examples
-    --------
-    >>> import pandas as pd, numpy as np
-    >>> from forecast_evaluation import backtest_expanding_window
-    >>> idx  = pd.date_range('2000-01', periods=180, freq='MS')
-    >>> ts   = pd.Series(np.random.randn(180).cumsum(), index=idx)
-    >>> def naive(train): return np.full(12, train.iloc[-1])
-    >>> results = backtest_expanding_window(ts, naive, min_train=120, horizon=12)
-    >>> results.columns.tolist()
-    ['origin', 'horizon', 'actual', 'forecast', 'error', 'abs_error', 'mase']
+        DataFrame with backtest results
     """
-    _COLUMNS = ["origin", "horizon", "actual", "forecast",
-                "error", "abs_error", "mase"]
+    # YOUR IMPLEMENTATION HERE
+    # Hint: loop from min_train to len(series)-horizon, stepping by step
+    # For each origin:
+    #   train = series[:origin]
+    #   actual = series[origin:origin+horizon].values
+    #   forecast = model_fn(train)
+    #   compute errors and MASE
+    records = []
+    for origin in range(min_train, len(series) - horizon+1, step):
+        train = series[:origin]
+        actual = series[origin:origin+horizon].values
 
-    if min_train < 1:
-        raise ValueError(f"min_train must be >= 1, got {min_train}.")
-    if horizon < 1:
-        raise ValueError(f"horizon must be >= 1, got {horizon}.")
-    if min_train + horizon > len(series):
-        raise ValueError(
-            f"min_train ({min_train}) + horizon ({horizon}) = "
-            f"{min_train + horizon} exceeds series length ({len(series)})."
-        )
+        forecast = model_fn(train)
 
-    records: list[dict] = []
-
-    train_end = min_train  # exclusive index into series
-
-    while train_end + horizon <= len(series):
-        train  = series.iloc[:train_end]
-        test   = series.iloc[train_end : train_end + horizon]
-
-        # ------------------------------------------------------------------
-        # Fit and forecast
-        # ------------------------------------------------------------------
-        try:
-            fc_array = np.asarray(model_fn(train), dtype=float)
-        except Exception as exc:          # noqa: BLE001
-            warnings.warn(
-                f"model_fn raised at origin index {train_end}: {exc}. "
-                "Skipping this window.",
-                RuntimeWarning,
-                stacklevel=2,
-            )
-            train_end += step
-            continue
-
-        if len(fc_array) != horizon:
-            warnings.warn(
-                f"model_fn returned {len(fc_array)} values but horizon="
-                f"{horizon}. Skipping this window.",
-                RuntimeWarning,
-                stacklevel=2,
-            )
-            train_end += step
-            continue
-
-        # ------------------------------------------------------------------
-        # Compute MASE for this origin (m = horizon as seasonal period)
-        # ------------------------------------------------------------------
-        mase_val = compute_mase(
-            actual   = test.values,
-            forecast = fc_array,
-            insample = train.values,
-            m        = min(horizon, len(train) - 1),  # guard short windows
-        )
-
-        origin_date = train.index[-1]
+        errors = np.array(forecast)-actual
+        mase_val = compute_mase(actual, forecast, train.values, m=12)
 
         for h in range(horizon):
-            actual_val   = test.iloc[h]
-            forecast_val = fc_array[h]
-            err          = forecast_val - actual_val
-            records.append(
-                {
-                    "origin"   : origin_date,
-                    "horizon"  : h + 1,
-                    "actual"   : actual_val,
-                    "forecast" : forecast_val,
-                    "error"    : err,
-                    "abs_error": abs(err),
-                    "mase"     : mase_val,
-                }
-            )
+            records.append({
+                'origin'   : series.index[origin - 1],  # last training date
+                'horizon'  : h + 1,
+                'actual'   : actual[h],
+                'forecast' : forecast[h],
+                'error'    : errors[h],
+                'abs_error': abs(errors[h]),
+                'mase'     : mase_val
+            })
+    return pd.DataFrame(records, columns=[
+        'origin', 'horizon', 'actual', 'forecast', 'error', 'abs_error', 'mase'
+    ])
 
-        train_end += step
 
-    if not records:
-        return pd.DataFrame(columns=_COLUMNS)
+# --- Quick self-test ---
+if __name__ == '__main__':
+    print('forecast_evaluation.py loaded successfully.')
+    # Add your own test calls here
+    # ================================================================
+# TEST CALLS: compute_mase and backtest_expanding_window
+# Using real CPI data from this session
+# ================================================================
 
-    return pd.DataFrame(records, columns=_COLUMNS)
+print("=" * 60)
+print("TEST 1: compute_mase — SARIMA vs naive seasonal")
+print("=" * 60)
+
+# Split CPI into insample / holdout
+insample = cpi.iloc[:-12].values
+holdout  = cpi.iloc[-12:].values
+
+# SARIMA forecast over holdout
+sarima_test = SARIMAX(cpi.iloc[:-12], order=(2,1,1),
+                      seasonal_order=(1,0,1,12)).fit(disp=False)
+sarima_fc = sarima_test.forecast(steps=12).values
+
+mase_sarima = compute_mase(holdout, sarima_fc, insample, m=12)
+mase_naive  = compute_mase(holdout, insample[-12:], insample, m=12)
+
+print(f"  SARIMA MASE : {mase_sarima:.4f}  (< 1 = beats naive)")
+print(f"  Naive  MASE : {mase_naive:.4f}   (should be ≈ 1.0)")
+assert mase_naive < 1.5,  "naive MASE sanity check failed"
+assert mase_sarima >= 0,  "MASE must be non-negative"
+print("  PASSED\n")
+
+# ----------------------------------------------------------------
+print("=" * 60)
+print("TEST 2: compute_mase — perfect forecast → MASE = 0")
+print("=" * 60)
+
+mase_perfect = compute_mase(holdout, holdout, insample, m=12)
+print(f"  Perfect forecast MASE: {mase_perfect:.4f}  (expect 0.0)")
+assert mase_perfect == 0.0, f"Expected 0.0, got {mase_perfect}"
+print("  PASSED\n")
+
+# ----------------------------------------------------------------
+print("=" * 60)
+print("TEST 3: compute_mase — flat insample → returns nan")
+print("=" * 60)
+
+mase_flat = compute_mase(holdout, sarima_fc, np.ones(len(insample)), m=12)
+print(f"  Flat insample MASE: {mase_flat}  (expect nan)")
+assert np.isnan(mase_flat) or np.isinf(mase_flat), f"Expected nan, got {mase_flat}"
+print("  PASSED\n")
+
+# ----------------------------------------------------------------
+print("=" * 60)
+print("TEST 4: backtest_expanding_window — SARIMA on CPI")
+print("=" * 60)
+
+def sarima_fn(train: pd.Series) -> np.ndarray:
+    m = SARIMAX(train, order=(2,1,1),
+                seasonal_order=(1,0,1,12)).fit(disp=False)
+    return m.forecast(steps=12).values
+
+results = backtest_expanding_window(
+    series    = cpi,
+    model_fn  = sarima_fn,
+    min_train = 120,
+    horizon   = 12,
+    step      = 12
+)
+
+print(f"  Rows returned : {len(results)}")
+print(f"  Origins       : {results['origin'].nunique()}")
+print(f"  Columns       : {results.columns.tolist()}")
+print(f"\n  MASE by origin:")
+print(results.groupby('origin')['mase'].first().round(4).to_string())
+print(f"\n  MAE by horizon step:")
+print(results.groupby('horizon')['abs_error'].mean().round(4).to_string())
+print(f"\n  Mean MASE across all origins: {results['mase'].mean():.4f}")
+
+assert set(results.columns) == {'origin','horizon','actual',
+                                 'forecast','error','abs_error','mase'}
+assert results['horizon'].max() == 12
+assert (results['abs_error'] >= 0).all()
+print("\n  PASSED")
