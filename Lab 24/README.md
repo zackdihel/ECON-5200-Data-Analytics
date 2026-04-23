@@ -14,11 +14,11 @@ Apply Double Machine Learning and Causal Forest methods to estimate the causal e
 ## Key Findings
 | Metric | Value |
 |---|---|
-| DML ATE | $8,290 |
-| 95% Confidence Interval | [$7,271, $9,308] |
+| DML ATE | $7,980 |
+| 95% Confidence Interval | [$7,126, $8,689] |
 | p-value | < 0.001 |
 | Mean CATE – Q1 income | $3,014 |
 | Mean CATE – Q4 income | $15,345 |
 | Within- vs. between-quartile variance ratio | 2.7× |
 
-401(k) eligibility causally increases net financial assets by approximately **$8,290**, an estimate robust to moderate unmeasured confounding. The Causal Forest revealed that income quartile alone is a coarse proxy for individual benefit — within-quartile variance was **2.7× larger** than between-quartile variance, meaning subgroup DML by income bracket systematically obscures the majority of treatment effect heterogeneity. By conditioning simultaneously on age, education, family structure, and homeownership, the Causal Forest surfaces high-response individuals across all income brackets, with practical implications for targeting policy outreach.
+401(k) eligibility causally increases net financial assets by approximately **$7,980**, an estimate robust to moderate unmeasured confounding. The Causal Forest revealed that income quartile alone is a coarse proxy for individual benefit — within-quartile variance was **2.7× larger** than between-quartile variance, meaning subgroup DML by income bracket systematically obscures the majority of treatment effect heterogeneity. By conditioning simultaneously on age, education, family structure, and homeownership, the Causal Forest surfaces high-response individuals across all income brackets, with practical implications for targeting policy outreach.
